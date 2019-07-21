@@ -1,0 +1,11 @@
+
+*.xml
+*.pyc
+.DS_Store
+*.iml
+*.meta
+*.B000000045123B
+*.png
+*.data-00000-of-00001
+*.index
+checkpoint/checkpoint
