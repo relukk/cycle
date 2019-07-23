@@ -11,4 +11,4 @@ fo = 64 # of filters of first layer for both gen & dis
 lamda = 0.2
 lr = 2e-4
 beta = 0.5
-epoch = 100
+epoch = 200

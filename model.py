@@ -53,7 +53,6 @@ class Cyclegan:
             l12 = l
             l13 = uk(l12,self.fl*2,self.fl*2,name='l13')
             l14 = uk(l13,self.fl*4,self.fl,name='l14')
-            # out = tf.pad(l14,paddings,mode='REFLECT')
             w = tf.get_variable(name='out_w',shape=[7,7,l14.get_shape()[-1],self.channel])
             out = tf.nn.conv2d(l14,w,[1,1,1,1],padding='SAME',name='out')
         return out
@@ -68,22 +67,22 @@ class Cyclegan:
 
     def build_model(self):
         self.data = tf.placeholder(dtype=tf.float32,shape=[self.bsz, self.height, self.width, self.channel],name='data')
-        self.label = self.data[:,:,0:self.height,:]
-        self.photo = self.data[:,:,self.height:,:]
-        self.fake_x = self.generator(self.label,name='g_g',reuse=False)#(G(x))
-        self.fake_y = self.generator(self.fake_x,name='g_f',reuse=False)#(F(G(x)))
-        self.r_x = self.generator(self.photo,name='g_f',reuse=True)#F(y)
-        self.r_y = self.generator(self.r_x,name='g_g',reuse=True)#G(F(y))
+        self.photo = self.data[:,:,0:self.height,:]
+        self.label = self.data[:,:,self.height:,:]
+        self.fake_x = self.generator(self.label,name='g_g',reuse=False)#(G(x)) should generate photo
+        self.fake_y = self.generator(self.fake_x,name='g_f',reuse=False)#(F(G(x))) should generate label
+        self.r_x = self.generator(self.photo,name='g_f',reuse=True)#F(y)  should generate label
+        self.r_y = self.generator(self.r_x,name='g_g',reuse=True)#G(F(y)) should generate photo
         self.d = self.discriminator(self.photo,name='d_y',reuse=False)#D(y)
         self.dd = self.discriminator(self.label,name='d_x',reuse=False)#D(x)
-        self.d_x = self.discriminator(self.fake_y,name='d_x',reuse=True)
+        self.d_x = self.discriminator(self.fake_y,name='d_x',reuse=True)#D(F(G(x)))
         self.d_y = self.discriminator(self.fake_x,name='d_y',reuse=True)
         self.loss = GANLoss('lsgan')
-        # self.lsgan_gg = self.loss(self.d_x,tf.ones_like(self.d_x))
-        self.lsgan_gg = tf.reduce_mean((tf.squared_difference(self.d_x, 1)))
-        self.lsgan_gf = self.loss(self.d_y,tf.ones_like(self.d_y))
-        self.lsgan_dy = 0.5*(self.loss(self.d,tf.zeros_like(self.d))+self.loss(self.d_y,tf.ones_like(self.d_y)))
-        self.lsgan_dx = 0.5*(self.loss(self.dd,tf.zeros_like(self.dd))+self.loss(self.d_x,tf.ones_like(self.d_x)))
+
+        self.lsgan_gg = self.loss(self.d_y,1) #positive cycle
+        self.lsgan_gf = self.loss(self.d_x,tf.ones_like(self.d_x))
+        self.lsgan_dy = 0.5*(self.loss(self.d,tf.ones_like(self.d))+self.loss(self.d_y,tf.zeros_like(self.d_y)))
+        self.lsgan_dx = 0.5*(self.loss(self.dd,tf.ones_like(self.dd))+self.loss(self.d_x,tf.zeros_like(self.d_x)))
         self.cl = CycleLoss(self.fake_y,self.label)
         self.ccl = self.cl(self.fake_y,self.label)+self.cl(self.r_y,self.photo)
 
@@ -112,9 +111,6 @@ class Cyclegan:
         self.d_x = tf.train.AdamOptimizer(self.lr, beta1=self.beta).minimize(self.dx_loss, var_list=self.dx_vars)
         self.g_f = tf.train.AdamOptimizer(self.lr, beta1=self.beta).minimize(self.gf_loss, var_list=self.gf_vars)
 
-        # data = glob(self.lfile)
-        # self.nda  ta = len(data)
-        # data = glob('/Users/lenovo/Documents/GAN/implementation/{}/train/*.jpg'.format('facades'))
         data = glob(self.lfile+'/*.'+self.img_code)
         self.ndata = len(data)
         merged = tf.summary.merge_all()
@@ -152,9 +148,8 @@ class Cyclegan:
                 gg_loss, gf_loss, dy_loss, dx_loss = self.sess.run([self.gg_loss,self.gf_loss,self.dy_loss,self.dx_loss],feed_dict={self.data:self.batch_img})
                 gs += 1
                 self.sess.run(self.gs.assign(gs))
-                print("Epoch: [%2d/%2d] [%4d/%4d] time: %4.4f, gg_loss: %.8f, gf_loss: %.8f, dy_loss: %.8f,\
-                 dx_loss: %.8f" % (e, self.epoch, index, totalbatch, time.time() - start_time, gg_loss,gf_loss,dy_loss, \
-                                   dx_loss))
+                print("Epoch: [%2d/%2d] [%4d/%4d] time: %4.4f, gg_loss: %.8f, gf_loss: %.8f, dy_loss: %.8f, dx_loss: %.8f" \
+                      % (e, self.epoch, index, totalbatch, time.time() - start_time, gg_loss,gf_loss,dy_loss,dx_loss))
                 if gs % 100 == 1:
                     summary = self.sess.run(merged, feed_dict={self.data: self.batch_img})
                     train_writer.add_summary(summary, gs)
@@ -166,6 +161,7 @@ class Cyclegan:
                     save_images(samples, image_manifold_size(samples.shape[0]), \
                                 './{}/train_{:02d}_{:04d}.png'.format('out/', e, index))
                     # print("[Sample] d_loss: %.8f, g_loss: %.8f" % (loss_d_real+loss_d_fake, loss_g))
+                    print('save image')
 
                 if gs % 500 == 2:
                     save(checkpoint_dir=self.ck_dir, saver=self.saver, sesss=self.sess, step=self.gs)
