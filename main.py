@@ -9,7 +9,7 @@ def main(_):
         '-p',
         '--fname',
         required=True,
-        help='dataset path'
+        help='path to dataset'
     )
     args.add_argument(
         '-c',

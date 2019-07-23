@@ -25,6 +25,7 @@ class Dataset:
 
         self.iterator = self.dataset.make_one_shot_iterator()
         self.one_batch = self.iterator.get_next()
+        self.batch = tf.subtract(tf.div(tf.to_float(self.one_batch),127.5),1)
 
 
 
