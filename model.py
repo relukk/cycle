@@ -53,8 +53,10 @@ class Cyclegan:
             l12 = l
             l13 = uk(l12,self.fl*2,self.fl*2,name='l13')
             l14 = uk(l13,self.fl*4,self.fl,name='l14')
+            paddings = tf.constant([[0,0],[3,3],[3,3],[0,0]])
+            pad = tf.pad(l14,paddings=paddings,mode='REFLECT')
             w = tf.get_variable(name='out_w',shape=[7,7,l14.get_shape()[-1],self.channel])
-            out = tf.nn.conv2d(l14,w,[1,1,1,1],padding='SAME',name='out')
+            out = tf.nn.tanh(tf.nn.conv2d(pad,w,[1,1,1,1],padding='VALID',name='out'))
         return out
 
     def discriminator(self,inp,name,reuse):
